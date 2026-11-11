@@ -1,0 +1,56 @@
+:root {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+
+  /* Theme tokens — event-controlled (Admin > Evento), not tied to the OS
+     color scheme: this is a dedicated kiosk window, not a shared web page. */
+  --bg: #111118;
+  --fg: #ffffff;
+  --fg-muted: rgba(255, 255, 255, 0.6);
+  --surface: #2a2a3a;
+  --surface-border: #444444;
+  --accent: #ff4d8d;
+  --accent-contrast: #ffffff;
+  --danger: #d64545;
+  --success: #4caf6a;
+  --spinner-track: #333333;
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --bg: #f7f5f8;
+  --fg: #1a1a22;
+  --fg-muted: rgba(26, 26, 34, 0.6);
+  --surface: #ececf2;
+  --surface-border: #d3d3dc;
+  --accent: #ff4d8d;
+  --accent-contrast: #ffffff;
+  --danger: #c73333;
+  --success: #2f9e57;
+  --spinner-track: #e0e0e6;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  /* Kiosk screen: no text selection, no drag-to-select, no scrollbars. */
+  -webkit-user-select: none;
+  user-select: none;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+img {
+  -webkit-user-drag: none;
+}
