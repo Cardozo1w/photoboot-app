@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { TouchButton } from '../../components/TouchButton'
 import type { ScreenProps } from '../ScreenProps'
 import type { PhotoBoothConfig } from '../../../electron/store'
+import type { PrinterInfo } from '../../../electron/preload'
 import { PinPad } from './PinPad'
 import { CameraPreview } from './CameraPreview'
 
@@ -20,6 +21,17 @@ export function Admin({ context, send }: ScreenProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>('printer')
   const [config, setConfig] = useState<PhotoBoothConfig | null>(null)
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
+  const [printers, setPrinters] = useState<PrinterInfo[] | null>(null)
+  const [testStatus, setTestStatus] = useState<string | null>(null)
+
+  const refreshPrinters = () => {
+    setPrinters(null)
+    window.photobooth.print.listPrinters().then(setPrinters).catch(() => setPrinters([]))
+  }
+
+  useEffect(() => {
+    if (activeTab === 'printer' && unlocked) refreshPrinters()
+  }, [activeTab, unlocked])
 
   useEffect(() => {
     if (!unlocked) return
@@ -51,6 +63,19 @@ export function Admin({ context, send }: ScreenProps) {
     send({ type: 'SET_PRINTER_MODE', mode })
     if (!config) return
     window.photobooth.config.update({ printer: { ...config.printer, mode } }).then(setConfig)
+  }
+
+  const handlePrinterSelect = (printerName: string) => {
+    if (!config) return
+    window.photobooth.config.update({ printer: { ...config.printer, printerName } }).then(setConfig)
+  }
+
+  const handleTestPrint = async () => {
+    setTestStatus('Imprimiendo prueba...')
+    const result = await window.photobooth.print
+      .run({ sessionId: 'prueba', mode: 'strip', shots: makeTestShots(), target: 'physical' })
+      .catch(() => ({ ok: false, error: 'Error desconocido' }))
+    setTestStatus(result.ok ? 'Prueba enviada a la impresora.' : `Error: ${result.error}`)
   }
 
   const handleThemeChange = (theme: PhotoBoothConfig['event']['theme']) => {
@@ -145,6 +170,30 @@ export function Admin({ context, send }: ScreenProps) {
                 Impresora física
               </TouchButton>
             </div>
+
+            <p>Impresora seleccionada: {config?.printer.printerName || 'ninguna'}</p>
+            <div className="screen__button-row">
+              {printers === null && <p className="screen--idle__hint">Buscando impresoras...</p>}
+              {printers?.length === 0 && <p className="screen--idle__hint">No se encontraron impresoras.</p>}
+              {printers?.map((printer) => (
+                <TouchButton
+                  key={printer.name}
+                  variant={config?.printer.printerName === printer.name ? 'primary' : 'secondary'}
+                  onClick={() => handlePrinterSelect(printer.name)}
+                >
+                  {printer.displayName || printer.name}
+                </TouchButton>
+              ))}
+            </div>
+            <div className="screen__button-row">
+              <TouchButton variant="secondary" onClick={refreshPrinters}>
+                Actualizar lista
+              </TouchButton>
+              <TouchButton variant="secondary" onClick={handleTestPrint} disabled={!config?.printer.printerName}>
+                Imprimir prueba
+              </TouchButton>
+            </div>
+            {testStatus && <p>{testStatus}</p>}
           </>
         )}
         {activeTab === 'filters' && config && (
@@ -211,6 +260,28 @@ export function Admin({ context, send }: ScreenProps) {
       <TouchButton variant="secondary" onClick={() => send({ type: 'ADMIN_EXIT' })}>
         Salir
       </TouchButton>
+      <TouchButton variant="secondary" onClick={() => window.photobooth.app.quit()}>
+        Cerrar aplicación
+      </TouchButton>
     </div>
   )
+}
+
+/** Placeholder photos for "Imprimir prueba", so the layout can be checked without a session. */
+function makeTestShots(): string[] {
+  const colors = ['#e76f51', '#2a9d8f', '#e9c46a', '#264653']
+  return colors.map((color, i) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 1200
+    canvas.height = 800
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = color
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = '#fff'
+    ctx.font = 'bold 120px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(`Prueba ${i + 1}`, canvas.width / 2, canvas.height / 2)
+    return canvas.toDataURL('image/png')
+  })
 }

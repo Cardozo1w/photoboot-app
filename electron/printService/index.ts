@@ -22,6 +22,8 @@ export interface PrintJobInput {
   sessionId: string
   mode: 'strip'
   shots: string[] // data URLs
+  /** Overrides printer.mode, e.g. "Guardar como PDF" after a failed print. */
+  target?: 'pdf' | 'physical'
 }
 
 export interface PrinterSettings {
@@ -44,8 +46,9 @@ export async function runPrintJob(
   event: EventSettings,
   input: PrintJobInput,
 ): Promise<PrintResult> {
+  const target = input.target ?? printer.mode
   const provider: PrintProvider =
-    printer.mode === 'physical'
+    target === 'physical'
       ? new PhysicalPrintProvider(printer.printerName)
       : new PdfPrintProvider(printer.outputFolder)
 

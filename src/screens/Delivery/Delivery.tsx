@@ -33,7 +33,12 @@ export function Delivery({ context, phase, send }: DeliveryProps) {
     if (!context.sessionId) return
 
     window.photobooth.print
-      .run({ sessionId: context.sessionId, mode: 'strip', shots: context.capturedShots })
+      .run({
+        sessionId: context.sessionId,
+        mode: 'strip',
+        shots: context.capturedShots,
+        target: phase === 'savingPdf' ? 'pdf' : 'physical',
+      })
       .then((result) => {
         if (phase === 'printing') {
           send(result.ok ? { type: 'PRINT_SUCCESS' } : { type: 'PRINT_ERROR', message: result.error ?? GENERIC_ERROR })

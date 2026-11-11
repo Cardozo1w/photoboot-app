@@ -15,13 +15,14 @@ import {
 } from 'pdf-lib'
 import type { PrintProvider, PrintLayout, PrintResult } from './index.js'
 
+// Shared with PhysicalPrintProvider so the printed page matches the PDF.
 const IN_TO_PT = 72
-const PAGE_WIDTH = 4 * IN_TO_PT
-const PAGE_HEIGHT = 6 * IN_TO_PT
-const STRIP_WIDTH = 2 * IN_TO_PT
-const OUTER_MARGIN = 8
-const CELL_GAP = 6
-const FOOTER_HEIGHT = 26
+export const PAGE_WIDTH = 4 * IN_TO_PT
+export const PAGE_HEIGHT = 6 * IN_TO_PT
+export const STRIP_WIDTH = 2 * IN_TO_PT
+export const OUTER_MARGIN = 8
+export const CELL_GAP = 6
+export const FOOTER_HEIGHT = 26
 
 async function writeAtomic(filePath: string, data: Buffer): Promise<void> {
   const tmpPath = `${filePath}.tmp`

@@ -1,6 +1,6 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, net, protocol, shell } from 'electron'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ConfigStore } from './store.js'
 import { logger } from './logger.js'
 import { saveSessionShots, type SaveShotsInput } from './sessionStore.js'
@@ -14,6 +14,33 @@ const KIOSK_MODE = process.env.PHOTOBOOTH_KIOSK !== 'false'
 
 let mainWindow: BrowserWindow | null = null
 let configStore: ConfigStore
+
+// The packaged app serves the built renderer from a custom secure scheme
+// instead of file://. Under file://, Vite's absolute asset URLs (/assets/...,
+// /mediapipe/...) resolve to the drive root, and fetch() — which MediaPipe
+// uses to load its wasm + model — refuses the file scheme entirely.
+const APP_SCHEME = 'app'
+const APP_URL = `${APP_SCHEME}://photobooth/index.html`
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: APP_SCHEME,
+    privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
+  },
+])
+
+function registerAppProtocol(): void {
+  const distDir = path.join(__dirname, '../dist')
+  protocol.handle(APP_SCHEME, (request) => {
+    const pathname = decodeURIComponent(new URL(request.url).pathname)
+    const filePath = path.join(distDir, pathname)
+    const relative = path.relative(distDir, filePath)
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      return new Response('Forbidden', { status: 403 })
+    }
+    return net.fetch(pathToFileURL(filePath).toString())
+  })
+}
 
 async function createWindow(): Promise<void> {
   mainWindow = new BrowserWindow({
@@ -69,7 +96,7 @@ async function createWindow(): Promise<void> {
     await mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL)
     mainWindow.webContents.openDevTools({ mode: 'detach' })
   } else {
-    await mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
+    await mainWindow.loadURL(APP_URL)
   }
 }
 
@@ -103,7 +130,17 @@ function registerIpcHandlers(): void {
     return result
   })
 
+  ipcMain.handle('print:listPrinters', async () => {
+    if (!mainWindow) return []
+    const printers = await mainWindow.webContents.getPrintersAsync()
+    return printers.map((p) => ({ name: p.name, displayName: p.displayName }))
+  })
+
   ipcMain.handle('app:getVersion', () => app.getVersion())
+
+  // Kiosk mode blocks Alt+F4 / Ctrl+Q, so the PIN-protected Admin screen is
+  // the only way for an operator to close the booth.
+  ipcMain.handle('app:quit', () => app.quit())
 
   ipcMain.handle('log:write', (_event, level: 'info' | 'warn' | 'error', message: string) => {
     logger[level](`[renderer] ${message}`)
@@ -111,6 +148,7 @@ function registerIpcHandlers(): void {
 }
 
 app.whenReady().then(async () => {
+  if (!process.env.VITE_DEV_SERVER_URL) registerAppProtocol()
   configStore = await ConfigStore.load()
   registerIpcHandlers()
   logger.info('App ready, creating main window')

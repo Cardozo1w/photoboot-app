@@ -3,6 +3,11 @@ import type { PhotoBoothConfig } from './store.js'
 import type { SaveShotsInput, SaveShotsResult } from './sessionStore.js'
 import type { PrintJobInput, PrintResult } from './printService/index.js'
 
+export interface PrinterInfo {
+  name: string
+  displayName: string
+}
+
 const api = {
   config: {
     get: (): Promise<PhotoBoothConfig> => ipcRenderer.invoke('config:get'),
@@ -18,9 +23,11 @@ const api = {
   },
   print: {
     run: (input: PrintJobInput): Promise<PrintResult> => ipcRenderer.invoke('print:run', input),
+    listPrinters: (): Promise<PrinterInfo[]> => ipcRenderer.invoke('print:listPrinters'),
   },
   app: {
     getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
+    quit: (): Promise<void> => ipcRenderer.invoke('app:quit'),
   },
   log: {
     info: (message: string): Promise<void> => ipcRenderer.invoke('log:write', 'info', message),
